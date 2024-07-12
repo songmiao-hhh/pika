@@ -13,17 +13,19 @@
 
 class RedisSender : public pink::Thread {
  public:
-  RedisSender(int id, std::string ip, int64_t port, std::string password);
+  RedisSender(int id, std::string ip, int64_t port, std::string password, int my_db_num);
   virtual ~RedisSender();
   void Stop(void);
   int64_t elements() {
     return elements_;
   }
 
-  void SendRedisCommand(const std::string &command);
+  void SendRedisCommand(const std::string &table_name, const std::string &command);
 
  private:
   int SendCommand(std::string &command);
+  void SelectDB(std::string &db_name);
+  void CheckDatabases();
   void ConnectRedis();
 
  private:
@@ -32,7 +34,7 @@ class RedisSender : public pink::Thread {
   slash::CondVar rsignal_;
   slash::CondVar wsignal_;
   slash::Mutex commands_mutex_;
-  std::queue<std::string> commands_queue_;
+  std::queue<std::pair<std::string, std::string>> dbname_commands_queue_;
   std::string ip_;
   int port_;
   std::string password_;
@@ -40,6 +42,7 @@ class RedisSender : public pink::Thread {
   int32_t cnt_;
   int64_t elements_;
   std::atomic<time_t> last_write_time_;
+  int my_db_num_;
 
   virtual void *ThreadMain();
 };

@@ -6,17 +6,18 @@
 #include "include/pika_sender.h"
 
 #include <glog/logging.h>
-
+#include <algorithm>
 #include "slash/include/xdebug.h"
 
-PikaSender::PikaSender(std::string ip, int64_t port, std::string password):
+PikaSender::PikaSender(std::string ip, int64_t port, std::string password, std::string db_name):
   cli_(NULL),
   signal_(&keys_mutex_),
   ip_(ip),
   port_(port),
   password_(password),
   should_exit_(false),
-  elements_(0)
+  elements_(0),
+  db_name_(db_name)
   {
   }
 
@@ -139,6 +140,34 @@ void PikaSender::SendCommand(std::string &command, const std::string &key) {
   }
 }
 
+void PikaSender::SelectDB() {
+  if(db_name_.length() <= 2) {
+    LOG(FATAL) << "DB name:" << db_name_ << " length is too small";
+  }
+  if(strcmp(db_name_.substr(0, 2).data(), "db")) {
+    LOG(FATAL) << "DB name:" << db_name_ << " is NOT start with \"db\"";
+  }
+  std::string db_idx = db_name_.substr(2);
+
+  if(!std::all_of(db_idx.begin(), db_idx.end(), ::isdigit)) {
+    LOG(FATAL) << db_idx << "is not digit";
+  }
+
+  pink::RedisCmdArgsType argv;
+  std::string cmd;
+  argv.push_back("SELECT");
+  argv.push_back(db_idx);
+  pink::SerializeRedisCommand(argv, &cmd);
+  slash::Status s = cli_->Send(&cmd);
+  if (!s.ok()) {
+    cli_->Close();
+    log_info("%s", s.ToString().data());
+    delete cli_;
+    cli_ = NULL;
+    ConnectRedis();
+  }
+}
+
 void *PikaSender::ThreadMain() {
   log_info("Start sender thread...");
   int cnt = 0;
@@ -146,7 +175,7 @@ void *PikaSender::ThreadMain() {
   if (cli_ == NULL) {
     ConnectRedis();
   }
-
+  SelectDB();
   while (!should_exit_ || QueueSize() != 0) {
     std::string command;
 
