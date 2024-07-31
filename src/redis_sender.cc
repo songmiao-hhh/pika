@@ -205,7 +205,6 @@ int RedisSender::SendCommand(std::string &command) {
 }
 
 void RedisSender::SelectDB(std::string &db_name) {
-  LOG(INFO) << "DB name:" << db_name;
   if(db_name.length() <= 2) {
     LOG(FATAL) << "DB name:" << db_name << " length is too small";
   }

@@ -436,6 +436,9 @@ int PikaConf::Load()
   target_redis_pwd_ = "";
   GetConfStr("target-redis-pwd" , &target_redis_pwd_);
 
+  source_db_name_ = "db0";
+  GetConfStr("source-db-name" , &source_db_name_);
+
   sync_batch_num_ = 100;
   GetConfInt("sync-batch-num", &sync_batch_num_);
 
