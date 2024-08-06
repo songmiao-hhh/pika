@@ -8,7 +8,7 @@
 
 #include <atomic>
 #include <unordered_map>
-
+#include <string>
 class QpsStatistic {
  public:
   QpsStatistic();

@@ -92,6 +92,12 @@ class PikaConf : public slash::BaseConf {
   int consensus_level()                             { return consensus_level_.load(); }
   int replication_num()                             { return replication_num_.load(); }
 
+  std::string target_redis_host()                   { return target_redis_host_; }
+  int target_redis_port()                           { return target_redis_port_; }
+  std::string target_redis_pwd()                    { return target_redis_pwd_;  }
+  int sync_batch_num()                              { return sync_batch_num_;    }
+  int redis_sender_num()                            { return redis_sender_num_;  }
+
   // Immutable config items, we don't use lock.
   bool daemonize()                                  { return daemonize_; }
   std::string pidfile()                             { return pidfile_; }
@@ -355,6 +361,13 @@ class PikaConf : public slash::BaseConf {
   // diff commands between cached commands and config file commands
   std::map<std::string, std::string> diff_commands_;
   void TryPushDiffCommands(const std::string& command, const std::string& value);
+
+  // migrate configure items
+  std::string target_redis_host_;
+  int target_redis_port_;
+  std::string target_redis_pwd_;
+  int sync_batch_num_;
+  int redis_sender_num_;
 
   //
   // Critical configure items

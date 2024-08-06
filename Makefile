@@ -90,22 +90,17 @@ INCLUDE_PATH = -I. \
 							 -I$(SLASH_PATH) \
 							 -I$(PINK_PATH) \
 							 -I$(BLACKWIDOW_PATH)/include \
+							 -I$(BLACKWIDOW_PATH)\
 							 -I$(ROCKSDB_PATH) \
 							 -I$(ROCKSDB_PATH)/include \
-
-ifeq ($(360),1)
-INCLUDE_PATH += -I$(GLOG_PATH)/src
-endif
+							 -I$(GLOG_PATH)/src \
 
 LIB_PATH = -L./ \
 					 -L$(SLASH_PATH)/slash/lib \
 					 -L$(PINK_PATH)/pink/lib \
 					 -L$(BLACKWIDOW_PATH)/lib \
 					 -L$(ROCKSDB_PATH)        \
-
-ifeq ($(360),1)
-LIB_PATH += -L$(GLOG_PATH)/.libs
-endif
+					 -L$(GLOG_PATH)/.libs     \
 
 LDFLAGS += $(LIB_PATH) \
 			 		 -lpink$(DEBUG_SUFFIX) \
@@ -114,6 +109,7 @@ LDFLAGS += $(LIB_PATH) \
 					 -lrocksdb$(DEBUG_SUFFIX) \
 					 -lglog \
 					 -lprotobuf \
+					 -static-libstdc++ \
 
 # ---------------End Dependences----------------
 
