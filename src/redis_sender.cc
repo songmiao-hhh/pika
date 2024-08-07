@@ -16,7 +16,7 @@
 
 static time_t kCheckDiff = 1;
 
-RedisSender::RedisSender(int id, std::string ip, int64_t port, std::string password, int my_db_num):
+RedisSender::RedisSender(int id, std::string ip, int64_t port, std::string password, int my_db_num, std::string db_name):
   id_(id),
   cli_(NULL),
   rsignal_(&commands_mutex_),
@@ -27,7 +27,8 @@ RedisSender::RedisSender(int id, std::string ip, int64_t port, std::string passw
   should_exit_(false),
   cnt_(0),
   elements_(0),
-  my_db_num_(my_db_num) {
+  my_db_num_(my_db_num),
+  db_name_(db_name) {
 
   last_write_time_ = ::time(NULL);
 }
@@ -204,15 +205,16 @@ int RedisSender::SendCommand(std::string &command) {
   return -1;
 }
 
-void RedisSender::SelectDB(std::string &db_name) {
-  if(db_name.length() <= 2) {
-    LOG(FATAL) << "DB name:" << db_name << " length is too small";
+void RedisSender::SelectDB() {
+  //LOG(INFO) << "DB name: " << db_name;
+  if(db_name_.length() <= 2) {
+    LOG(FATAL) << "DB name:" << db_name_ << " length is too small";
   }
-  if(strcmp(db_name.substr(0, 2).data(), "db")) {
-    LOG(FATAL) << "DB name:" << db_name << " is NOT start with \"db\"";
+  if(strcmp(db_name_.substr(0, 2).data(), "db")) {
+    LOG(FATAL) << "DB name:" << db_name_ << " is NOT start with \"db\"";
   }
 
-  std::string db_idx = db_name.substr(2);
+  std::string db_idx = db_name_.substr(2);
   if(!std::all_of(db_idx.begin(), db_idx.end(), ::isdigit)) {
     LOG(FATAL) << db_idx << "is not digit";
   }
@@ -239,6 +241,7 @@ void *RedisSender::ThreadMain() {
 
   ConnectRedis();
   CheckDatabases();
+  SelectDB();
 
   while (!should_exit_) {
     commands_mutex_.Lock();
@@ -260,16 +263,13 @@ void *RedisSender::ThreadMain() {
 
     // get redis command
     std::string command;
-    std::string db_name;
     commands_mutex_.Lock();
-    db_name = dbname_commands_queue_.front().first;
     command = dbname_commands_queue_.front().second;
     // printf("%d, command %s\n", id_, command.c_str());
     elements_++;
     dbname_commands_queue_.pop();
     wsignal_.Signal();
     commands_mutex_.Unlock();
-    SelectDB(db_name);
     ret = SendCommand(command);
     if (ret == 0) {
       cnt_++;

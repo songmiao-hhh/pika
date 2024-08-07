@@ -103,7 +103,8 @@ PikaServer::PikaServer() :
                             g_pika_conf->target_redis_host(),
                             g_pika_conf->target_redis_port(),
                             g_pika_conf->target_redis_pwd(),
-                            g_pika_conf->databases()));
+                            g_pika_conf->databases(),
+                            g_pika_conf->source_db_name()));
   }
 
   pthread_rwlock_init(&state_protector_, NULL);

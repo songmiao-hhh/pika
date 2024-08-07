@@ -13,7 +13,7 @@
 
 class RedisSender : public pink::Thread {
  public:
-  RedisSender(int id, std::string ip, int64_t port, std::string password, int my_db_num);
+  RedisSender(int id, std::string ip, int64_t port, std::string password, int my_db_num, std::string db_name);
   virtual ~RedisSender();
   void Stop(void);
   int64_t elements() {
@@ -24,7 +24,7 @@ class RedisSender : public pink::Thread {
 
  private:
   int SendCommand(std::string &command);
-  void SelectDB(std::string &db_name);
+  void SelectDB();
   void CheckDatabases();
   void ConnectRedis();
 
@@ -36,6 +36,7 @@ class RedisSender : public pink::Thread {
   slash::Mutex commands_mutex_;
   std::queue<std::pair<std::string, std::string>> dbname_commands_queue_;
   std::string ip_;
+  std::string db_name_;
   int port_;
   std::string password_;
   bool should_exit_;
