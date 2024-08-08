@@ -43,6 +43,10 @@ int PikaReplBgWorker::StopThread() {
 }
 
 void PikaReplBgWorker::Schedule(pink::TaskFunc func, void* arg) {
+  if(!strcmp("on", g_pika_conf->slow_master_trans().data())) {
+    int slow_time = g_pika_conf->slow_time();
+    usleep(slow_time);
+  }
   bg_thread_.Schedule(func, arg);
 }
 

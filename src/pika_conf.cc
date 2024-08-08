@@ -533,6 +533,12 @@ int PikaConf::Load()
 
   redis_sender_num_ = 8;
   GetConfInt("redis-sender-num", &redis_sender_num_);
+
+  slow_master_trans_ = "off";
+  GetConfStr("slow-master-trans" , &slow_master_trans_);
+
+  slow_time_ = 2;
+  GetConfInt("slow-time" , &slow_time_);
   return ret;
 }
 

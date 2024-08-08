@@ -97,6 +97,8 @@ class PikaConf : public slash::BaseConf {
   std::string target_redis_pwd()                    { return target_redis_pwd_;  }
   int sync_batch_num()                              { return sync_batch_num_;    }
   int redis_sender_num()                            { return redis_sender_num_;  }
+  std::string slow_master_trans()                   { return slow_master_trans_; }
+  int slow_time()                                   { return slow_time_;         }
 
   // Immutable config items, we don't use lock.
   bool daemonize()                                  { return daemonize_; }
@@ -368,6 +370,8 @@ class PikaConf : public slash::BaseConf {
   std::string target_redis_pwd_;
   int sync_batch_num_;
   int redis_sender_num_;
+  std::string slow_master_trans_;
+  int slow_time_;
 
   //
   // Critical configure items
