@@ -111,7 +111,9 @@ PikaServer::PikaServer() :
             new RedisSender(int(i),
                             g_pika_conf->target_redis_host(),
                             g_pika_conf->target_redis_port(),
-                            g_pika_conf->target_redis_pwd()));
+                            g_pika_conf->target_redis_pwd(),
+                            g_pika_conf->databases(),
+                            g_pika_conf->source_db_name()));
   }
 
   pthread_rwlock_init(&state_protector_, NULL);
@@ -1428,14 +1430,14 @@ void PikaServer::PubSubNumSub(const std::vector<std::string>& channels,
   pika_pubsub_thread_->PubSubNumSub(channels, result);
 }
 
-int PikaServer::SendRedisCommand(const std::string& command, const std::string& key) {
+int PikaServer::SendRedisCommand(const std::string& table_name, const std::string& command, const std::string& key) {
   // Send command
   size_t idx = std::hash<std::string>()(key) % redis_senders_.size();
-  redis_senders_[idx]->SendRedisCommand(command);
+  redis_senders_[idx]->SendRedisCommand(table_name, command);
   return 0;
 }
 
-void PikaServer::RetransmitData(const std::string& path) {
+void PikaServer::RetransmitData(const std::string& path, const std::string& table_name) {
 
   blackwidow::BlackWidow *db = new blackwidow::BlackWidow();
   rocksdb::Status s = db->Open(g_pika_server->bw_options(), path);
@@ -1458,7 +1460,7 @@ void PikaServer::RetransmitData(const std::string& path) {
   std::vector<MigratorThread*> migrators;
 
   for (int i = 0; i < thread_num; i++) {
-    pika_senders.emplace_back(new PikaSender(target_host, target_port, target_pwd));
+    pika_senders.emplace_back(new PikaSender(target_host, target_port, target_pwd, table_name));
   }
   migrators.emplace_back(new MigratorThread(db, &pika_senders, blackwidow::kStrings, thread_num));
   migrators.emplace_back(new MigratorThread(db, &pika_senders, blackwidow::kLists, thread_num));

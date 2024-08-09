@@ -42,12 +42,19 @@ int PikaReplBgWorker::StopThread() {
   return bg_thread_.StopThread();
 }
 
+// static int count = 0;
 void PikaReplBgWorker::Schedule(pink::TaskFunc func, void* arg) {
   if(!strcmp("on", g_pika_conf->slow_master_trans().data())) {
     int slow_time = g_pika_conf->slow_time();
     usleep(slow_time);
   }
   bg_thread_.Schedule(func, arg);
+  // count++;
+  // if(count >= 100) {
+  //   int presize = 0, queuesize = 0;
+  //   bg_thread_.QueueSize(&presize, &queuesize);
+  //   LOG(INFO) << "queuesize:" << queuesize << "presize" << presize;
+  // }
 }
 
 void PikaReplBgWorker::QueueClear() {
@@ -296,38 +303,40 @@ void PikaReplBgWorker::HandleBGWorkerWriteDB(void* arg) {
   }
   std::shared_ptr<Partition> partition = g_pika_server->GetTablePartitionById(table_name, partition_id);
 
-  if (strcmp(table_name.data(), "db0") || partition_id != 0) {
+  if (partition_id != 0) {
     LOG(FATAL) << "table_name: " << table_name <<  ", partition_id: "
-      << std::to_string(partition_id) << ", but only single DB data is support transfer";
+      << std::to_string(partition_id) << ", multi-partition cluster do not support migration";
     return;
   }
 
   /* convert Pika custom command to Redis standard command */
-  if (!strcasecmp((argv)[0].data(), "pksetexat")) {
-    if (argv.size() != 4) {
-      LOG(WARNING) << "find invaild command, command size: " << argv.size();
-      return;
+  if(!strcmp(table_name.data(), g_pika_conf->source_db_name().data())) {
+    if (!strcasecmp((argv)[0].data(), "pksetexat")) {
+      if (argv.size() != 4) {
+        LOG(WARNING) << "find invaild command, command size: " << argv.size();
+        return;
+      } else {
+        std::string key = (argv)[1];
+        int timestamp = std::atoi((argv)[2].data());
+        std::string value = (argv)[3];
+
+        int seconds = timestamp - time(NULL);
+        PikaCmdArgsType tmp_argv;
+        tmp_argv.push_back("setex");
+        tmp_argv.push_back(key);
+        tmp_argv.push_back(std::to_string(seconds));
+        tmp_argv.push_back(value);
+
+        std::string command;
+        pink::SerializeRedisCommand(tmp_argv, &command);
+        g_pika_server->SendRedisCommand(table_name, command, key);
+      }
     } else {
-      std::string key = (argv)[1];
-      int timestamp = std::atoi((argv)[2].data());
-      std::string value = (argv)[3];
-
-      int seconds = timestamp - time(NULL);
-      PikaCmdArgsType tmp_argv;
-      tmp_argv.push_back("setex");
-      tmp_argv.push_back(key);
-      tmp_argv.push_back(std::to_string(seconds));
-      tmp_argv.push_back(value);
-
+      std::string key = argv.size() > 1 ? (argv)[1] : "";
       std::string command;
-      pink::SerializeRedisCommand(tmp_argv, &command);
-      g_pika_server->SendRedisCommand(command, key);
+      pink::SerializeRedisCommand(argv, &command);
+      g_pika_server->SendRedisCommand(table_name, command, key);
     }
-  } else {
-    std::string key = argv.size() > 1 ? (argv)[1] : "";
-    std::string command;
-    pink::SerializeRedisCommand(argv, &command);
-    g_pika_server->SendRedisCommand(command, key);
   }
 
   // Add read lock for no suspend command

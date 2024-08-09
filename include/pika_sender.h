@@ -13,7 +13,7 @@
 
 class PikaSender : public pink::Thread {
 public:
-  PikaSender(std::string ip, int64_t port, std::string password);
+  PikaSender(std::string ip, int64_t port, std::string password, std::string db_name);
   virtual ~PikaSender();
   void LoadKey(const std::string &cmd);
   void Stop();
@@ -21,6 +21,7 @@ public:
   int64_t elements() { return elements_; }
 
   void SendCommand(std::string &command, const std::string &key);
+  void SelectDB();
   int QueueSize();
   void ConnectRedis();
 
@@ -34,6 +35,7 @@ private:
   std::string password_;
   std::atomic<bool> should_exit_;
   int64_t elements_;
+  std::string db_name_;
 
   virtual void *ThreadMain();
 };

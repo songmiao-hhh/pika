@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <glog/logging.h>
+#include <unordered_set>
 
 #include "pink/include/pink_cli.h"
 
@@ -1094,13 +1095,18 @@ Status PikaReplicaManager::SendPartitionTrySyncRequest(
   return status;
 }
 
-static bool already_dbsync = false;
+static std::unordered_set<std::string> already_dbsync_st;
 Status PikaReplicaManager::SendPartitionDBSyncRequest(
         const std::string& table_name, size_t partition_id) {
-  if (!already_dbsync) {
-    already_dbsync = true;
+  LOG(INFO) << "start to request sync, table_name:" << table_name;
+  if (already_dbsync_st.find(table_name) == already_dbsync_st.end()) {
+    already_dbsync_st.insert(table_name);
   } else {
     LOG(FATAL) << "we only allow one DBSync action to avoid passing duplicate commands to target Redis multiple times";
+  }
+  if (partition_id != 0) {
+    LOG(FATAL) << "table_name: " << table_name <<  ", partition_id: "
+      << std::to_string(partition_id) << ", multi-partition cluster do not support migration";
   }
   
   BinlogOffset boffset;

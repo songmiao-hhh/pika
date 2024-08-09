@@ -8,6 +8,7 @@
 
 #include <time.h>
 #include <unistd.h>
+#include <algorithm>
 
 #include <glog/logging.h>
 
@@ -15,7 +16,7 @@
 
 static time_t kCheckDiff = 1;
 
-RedisSender::RedisSender(int id, std::string ip, int64_t port, std::string password):
+RedisSender::RedisSender(int id, std::string ip, int64_t port, std::string password, int my_db_num, std::string db_name):
   id_(id),
   cli_(NULL),
   rsignal_(&commands_mutex_),
@@ -25,7 +26,9 @@ RedisSender::RedisSender(int id, std::string ip, int64_t port, std::string passw
   password_(password),
   should_exit_(false),
   cnt_(0),
-  elements_(0) {
+  elements_(0),
+  my_db_num_(my_db_num),
+  db_name_(db_name) {
 
   last_write_time_ = ::time(NULL);
 }
@@ -119,21 +122,58 @@ void RedisSender::Stop() {
   commands_mutex_.Unlock();
 }
 
-void RedisSender::SendRedisCommand(const std::string &command) {
+void RedisSender::SendRedisCommand(const std::string &table_name, const std::string &command) {
   commands_mutex_.Lock();
-  if (commands_queue_.size() < 100000) {
-    commands_queue_.push(command);
+  if (dbname_commands_queue_.size() < 100000) {
+    dbname_commands_queue_.push(std::make_pair(table_name, command));
     rsignal_.Signal();
     commands_mutex_.Unlock();
     return;
   }
 
-  while (commands_queue_.size() > 100000) {
+  while (dbname_commands_queue_.size() > 100000) {
     wsignal_.Wait();
   }
-  commands_queue_.push(command);
+  dbname_commands_queue_.push(std::make_pair(table_name, command));
   rsignal_.Signal();
   commands_mutex_.Unlock();
+}
+
+void RedisSender::CheckDatabases() {
+  ConnectRedis();
+  pink::RedisCmdArgsType argv, resp;
+  std::string cmd;
+  argv.push_back("config");
+  argv.push_back("get");
+  argv.push_back("databases");
+  pink::SerializeRedisCommand(argv, &cmd);
+  slash::Status s = cli_->Send(&cmd);
+
+  if (s.ok()) {
+    s = cli_->Recv(&resp);
+    if (resp[0] == "databases") {
+      std::string db_num = resp[1];
+      LOG(INFO) << "checkdatabases, target_db_num:" << db_num << ", my_db_num:" << my_db_num_;
+      if(!std::all_of(db_num.begin(), db_num.end(), ::isdigit)) {
+        LOG(FATAL) << "DB num: " << db_num << "is not digit";
+      }
+      int target_db_num = std::stoi(db_num);
+      if(target_db_num < my_db_num_) {
+        LOG(FATAL) << "Target DB num is smaller than mine, target DB num: " << target_db_num << ", my DB num: " << my_db_num_;
+      }
+    } else {
+      LOG(FATAL) << "Check databases fail, first resp is NOT databases, it is " << resp[0];
+      cli_->Close();
+      delete cli_;
+      cli_ = NULL;
+      should_exit_ = true;
+    }
+  } else {
+    LOG(FATAL) << "Send get databases command failed: " << s.ToString();
+    cli_->Close();
+    delete cli_;
+    cli_ = NULL;
+  }    
 }
 
 int RedisSender::SendCommand(std::string &command) {
@@ -165,16 +205,47 @@ int RedisSender::SendCommand(std::string &command) {
   return -1;
 }
 
+void RedisSender::SelectDB() {
+  //LOG(INFO) << "DB name: " << db_name;
+  if(db_name_.length() <= 2) {
+    LOG(FATAL) << "DB name:" << db_name_ << " length is too small";
+  }
+  if(strcmp(db_name_.substr(0, 2).data(), "db")) {
+    LOG(FATAL) << "DB name:" << db_name_ << " is NOT start with \"db\"";
+  }
+
+  std::string db_idx = db_name_.substr(2);
+  if(!std::all_of(db_idx.begin(), db_idx.end(), ::isdigit)) {
+    LOG(FATAL) << db_idx << "is not digit";
+  }
+
+  pink::RedisCmdArgsType argv;
+  std::string cmd;
+  argv.push_back("SELECT");
+  argv.push_back(db_idx);
+  pink::SerializeRedisCommand(argv, &cmd);
+  slash::Status s = cli_->Send(&cmd);
+  if (!s.ok()) {
+    cli_->Close();
+    log_info("%s", s.ToString().data());
+    delete cli_;
+    cli_ = NULL;
+    ConnectRedis();
+  }
+}
+
 void *RedisSender::ThreadMain() {
   LOG(INFO) << "Start redis sender " << id_ << " thread...";
   // sleep(15);
   int ret = 0;
 
   ConnectRedis();
+  CheckDatabases();
+  SelectDB();
 
   while (!should_exit_) {
     commands_mutex_.Lock();
-    while (commands_queue_.size() == 0 && !should_exit_) {
+    while (dbname_commands_queue_.size() == 0 && !should_exit_) {
       rsignal_.TimedWait(100);
       // rsignal_.Wait();
     }
@@ -184,7 +255,7 @@ void *RedisSender::ThreadMain() {
       break;
     }
 
-    if (commands_queue_.size() == 0) {
+    if (dbname_commands_queue_.size() == 0) {
       commands_mutex_.Unlock();
       continue;
     }
@@ -193,10 +264,10 @@ void *RedisSender::ThreadMain() {
     // get redis command
     std::string command;
     commands_mutex_.Lock();
-    command = commands_queue_.front();
+    command = dbname_commands_queue_.front().second;
     // printf("%d, command %s\n", id_, command.c_str());
     elements_++;
-    commands_queue_.pop();
+    dbname_commands_queue_.pop();
     wsignal_.Signal();
     commands_mutex_.Unlock();
     ret = SendCommand(command);

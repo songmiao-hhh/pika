@@ -300,8 +300,8 @@ class PikaServer {
   /*
    * migrate used
    */
-  int SendRedisCommand(const std::string& command, const std::string& key);
-  void RetransmitData(const std::string& path);
+  int SendRedisCommand(const std::string& table_name, const std::string& command, const std::string& key);
+  void RetransmitData(const std::string& path, const std::string& table_name);
 
   // info debug use
   void ServerStatus(std::string* info);

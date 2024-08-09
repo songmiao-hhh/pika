@@ -528,6 +528,9 @@ int PikaConf::Load()
   target_redis_pwd_ = "";
   GetConfStr("target-redis-pwd" , &target_redis_pwd_);
 
+  source_db_name_ = "db0";
+  GetConfStr("source-db-name" , &source_db_name_);
+
   sync_batch_num_ = 100;
   GetConfInt("sync-batch-num", &sync_batch_num_);
 
@@ -536,6 +539,9 @@ int PikaConf::Load()
 
   slow_master_trans_ = "off";
   GetConfStr("slow-master-trans" , &slow_master_trans_);
+  if(!strcmp("on", slow_master_trans_.data())) {
+    LOG(INFO) << "Slow master trans button is opended";
+  }
 
   slow_time_ = 2;
   GetConfInt("slow-time" , &slow_time_);
