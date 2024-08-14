@@ -528,9 +528,6 @@ int PikaConf::Load()
   target_redis_pwd_ = "";
   GetConfStr("target-redis-pwd" , &target_redis_pwd_);
 
-  source_db_name_ = "db0";
-  GetConfStr("source-db-name" , &source_db_name_);
-
   sync_batch_num_ = 100;
   GetConfInt("sync-batch-num", &sync_batch_num_);
 
@@ -545,6 +542,12 @@ int PikaConf::Load()
 
   slow_time_ = 2;
   GetConfInt("slow-time" , &slow_time_);
+
+  delay_connect_ = "off";
+  GetConfStr("delay-connect" , &delay_connect_);
+  if(!strcmp("on", delay_connect_.data())) {
+    LOG(INFO) << "Delay connect button is opended";
+  }
   return ret;
 }
 

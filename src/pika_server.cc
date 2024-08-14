@@ -106,14 +106,18 @@ PikaServer::PikaServer() :
   pika_client_processor_ = new PikaClientProcessor(g_pika_conf->thread_pool_size(), 100000);
 
   // Create redis sender
-  for (int i = 0; i < g_pika_conf->redis_sender_num(); i++) {
-    redis_senders_.emplace_back(
-            new RedisSender(int(i),
+  for (int i = 0; i < g_pika_conf->databases(); i++) {
+    std::string cur_db_name = "db" + std::to_string(i);
+    for (int j = 0; j < g_pika_conf->redis_sender_num(); j++) {
+      redis_senders_.emplace_back(
+            new RedisSender(int(i * g_pika_conf->redis_sender_num() + j),
                             g_pika_conf->target_redis_host(),
                             g_pika_conf->target_redis_port(),
                             g_pika_conf->target_redis_pwd(),
                             g_pika_conf->databases(),
-                            g_pika_conf->source_db_name()));
+                            cur_db_name));
+      LOG(INFO) << "Create redis sender, db: " << cur_db_name << " id: " << int(i * g_pika_conf->redis_sender_num() + j);
+    } 
   }
 
   pthread_rwlock_init(&state_protector_, NULL);
@@ -1431,8 +1435,9 @@ void PikaServer::PubSubNumSub(const std::vector<std::string>& channels,
 }
 
 int PikaServer::SendRedisCommand(const std::string& table_name, const std::string& command, const std::string& key) {
+  int dbnum = std::stoi(table_name.substr(2));
   // Send command
-  size_t idx = std::hash<std::string>()(key) % redis_senders_.size();
+  size_t idx = std::hash<std::string>()(key) % g_pika_conf->redis_sender_num() + dbnum * g_pika_conf->redis_sender_num();
   redis_senders_[idx]->SendRedisCommand(table_name, command);
   return 0;
 }

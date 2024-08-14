@@ -319,19 +319,14 @@ void PikaReplClientConn::DispatchBinlogRes(const std::shared_ptr<InnerMessage::I
       break;
     }
     slave_partition->SetLastRecvTime(slash::NowMicros());
-
-    // if(!strcmp(binlog_nums.first.table_name_.data(), g_pika_conf->source_db_name().data())) {
-    //   if(!strcmp("on", g_pika_conf->slow_master_trans().data())) {
-    //     int slow_time = g_pika_conf->slow_time();
-    //     usleep(slow_time);
-    //   }
-    // }
-    
     g_pika_rm->ScheduleWriteBinlogTask(
         binlog_nums.first.table_name_ + std::to_string(binlog_nums.first.partition_id_),
         res,
         std::dynamic_pointer_cast<PikaReplClientConn>(shared_from_this()),
         reinterpret_cast<void*>(binlog_nums.second));
+    // if(!strcmp(binlog_nums.first.table_name_.data(), "db2")) {
+    //   LOG(INFO) << "schedule, db:" <<binlog_nums.first.table_name_;
+    // }
   }
 }
 

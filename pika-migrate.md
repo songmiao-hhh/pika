@@ -43,4 +43,4 @@ slow-time         : 2
 1. Pika支持不同数据结构采用同名Key, 但是Redis不支持, 所以在有同Key数据的场景下, 以第一个迁移到Redis数据结构为准, 其他同Key数据结构会丢失
 2. 该工具只支持热迁移单机模式下, 并且只采用单DB版本的Pika, 如果是集群模式, 或者是多DB场景, 工具会报错并且退出.
 3. 为了避免由于主库Binlog被清理导致该工具触发多次全量同步向Redis写入脏数据, 工具自身做了保护, 在第二次触发全量同步时会报错退出.
-4. 工具依赖一些三方库，git clone下来后请使用git submodule update --init拉取三方库
+4. 工具依赖一些三方库，git clone下来后请使用`git submodule update --init`拉取三方库

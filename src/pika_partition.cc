@@ -181,6 +181,7 @@ void Partition::PrepareRsync() {
 // 1, Check dbsync finished, got the new binlog offset
 // 2, Replace the old db
 // 3, Update master offset, and the PikaAuxiliaryThread cron will connect and do slaveof task with master
+static std::unordered_set<std::shared_ptr<SyncSlavePartition>> delay_state_change_set;
 bool Partition::TryUpdateMasterOffset() {
   std::string info_path = dbsync_path_ + kBgsaveInfoFile;
   if (!slash::FileExists(info_path)) {
@@ -251,9 +252,7 @@ bool Partition::TryUpdateMasterOffset() {
   }
 
   // Retransmit Data to target redis
-  if(!strcmp(table_name_.data(), g_pika_conf->source_db_name().data())) {
-    g_pika_server->RetransmitData(dbsync_path_, table_name_);
-  }
+  g_pika_server->RetransmitData(dbsync_path_, table_name_);
 
   slash::DeleteFile(info_path);
   if (!ChangeDb(dbsync_path_)) {
@@ -276,7 +275,18 @@ bool Partition::TryUpdateMasterOffset() {
   } else {
     master_partition->Logger()->SetProducerStatus(filenum, offset);
   }
-  slave_partition->SetReplState(ReplState::kTryConnect);
+  if(!strcmp("on", g_pika_conf->delay_connect().data())) {
+    delay_state_change_set.insert(slave_partition);
+    if(delay_state_change_set.size() >= g_pika_conf->databases()) {
+      for(auto iter = delay_state_change_set.begin(); iter != delay_state_change_set.end(); iter++) {
+        (*iter)->SetReplState(ReplState::kTryConnect);
+      }
+      delay_state_change_set.clear();
+      LOG(INFO) << "Change all repl state to \"connect\" complete";
+    }
+  } else {
+    slave_partition->SetReplState(ReplState::kTryConnect);
+  }
   return true;
 }
 

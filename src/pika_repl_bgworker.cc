@@ -54,6 +54,7 @@ void PikaReplBgWorker::Schedule(pink::TaskFunc func, void* arg) {
   //   int presize = 0, queuesize = 0;
   //   bg_thread_.QueueSize(&presize, &queuesize);
   //   LOG(INFO) << "queuesize:" << queuesize << "presize" << presize;
+  //   count = 0;
   // }
 }
 
@@ -107,6 +108,9 @@ void PikaReplBgWorker::HandleBGWorkerWriteBinlog(void* arg) {
 
   if (pb_begin == LogOffset()) {
     only_keepalive = true;
+    // if(!strcmp(table_name.data(), "db2")) {
+    //   LOG(INFO) << "ping, db:" << table_name;
+    // }
   }
 
   LogOffset ack_start;
@@ -310,33 +314,31 @@ void PikaReplBgWorker::HandleBGWorkerWriteDB(void* arg) {
   }
 
   /* convert Pika custom command to Redis standard command */
-  if(!strcmp(table_name.data(), g_pika_conf->source_db_name().data())) {
-    if (!strcasecmp((argv)[0].data(), "pksetexat")) {
-      if (argv.size() != 4) {
-        LOG(WARNING) << "find invaild command, command size: " << argv.size();
-        return;
-      } else {
-        std::string key = (argv)[1];
-        int timestamp = std::atoi((argv)[2].data());
-        std::string value = (argv)[3];
-
-        int seconds = timestamp - time(NULL);
-        PikaCmdArgsType tmp_argv;
-        tmp_argv.push_back("setex");
-        tmp_argv.push_back(key);
-        tmp_argv.push_back(std::to_string(seconds));
-        tmp_argv.push_back(value);
-
-        std::string command;
-        pink::SerializeRedisCommand(tmp_argv, &command);
-        g_pika_server->SendRedisCommand(table_name, command, key);
-      }
+  if (!strcasecmp((argv)[0].data(), "pksetexat")) {
+    if (argv.size() != 4) {
+      LOG(WARNING) << "find invaild command, command size: " << argv.size();
+      return;
     } else {
-      std::string key = argv.size() > 1 ? (argv)[1] : "";
+      std::string key = (argv)[1];
+      int timestamp = std::atoi((argv)[2].data());
+      std::string value = (argv)[3];
+
+      int seconds = timestamp - time(NULL);
+      PikaCmdArgsType tmp_argv;
+      tmp_argv.push_back("setex");
+      tmp_argv.push_back(key);
+      tmp_argv.push_back(std::to_string(seconds));
+      tmp_argv.push_back(value);
+
       std::string command;
-      pink::SerializeRedisCommand(argv, &command);
+      pink::SerializeRedisCommand(tmp_argv, &command);
       g_pika_server->SendRedisCommand(table_name, command, key);
     }
+  } else {
+    std::string key = argv.size() > 1 ? (argv)[1] : "";
+    std::string command;
+    pink::SerializeRedisCommand(argv, &command);
+    g_pika_server->SendRedisCommand(table_name, command, key);
   }
 
   // Add read lock for no suspend command
